@@ -64,24 +64,21 @@ end
 g.before_each(function() end)
 
 local function insert_customers(conn, id, count, timeout, report)
-    local customer = {
-        id = id,
-        name = "David",
-        last_name = "Smith",
-        age = 33,
-        city = "Los Angeles",
-    }
-
+    local customer = {id, box.NULL, 'David', 'Smith', 33, 'Los Angeles'}
     local start = fiber.clock()
 
     while (fiber.clock() - start) < timeout do
-        local _, err = conn:call([[package.loaded.crud.insert]], {'customers', customer})
-        if err ~= nil then
+        local ok, res, err = pcall(conn.call, conn, [[package.loaded.crud.insert]], {'customers', customer})
+        if not ok then
+            log.error('Insert error: %s', res)
+            table.insert(report.errors, res)
+        elseif err ~= nil then
+            log.error('Insert error: %s', err)
             table.insert(report.errors, err)
         else
             report.count = report.count + 1
         end
-        customer.id = customer.id + count
+        customer[1] = customer[1] + count
     end
 end
 
@@ -89,7 +86,7 @@ local function select_customers(conn, id, timeout, report)
     local start = fiber.clock()
     local ok, err = pcall(function()
         while (fiber.clock() - start) < timeout do
-            local _, err = conn:call([[package.loaded.crud.select]], {'customers', {{'>', 'id', id}}, {limit = 10}})
+            local _, err = conn:call([[package.loaded.crud.select]], {'customers', {{'>', 'id', id}}, {first = 10}})
             if err ~= nil then
                 log.error(err)
                 table.insert(report.errors, err)
