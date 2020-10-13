@@ -83,10 +83,7 @@ local function insert_customers(g, customers)
     local inserted_objects = {}
 
     for _, customer in ipairs(customers) do
-        local result, err = g.cluster.main_server.net_box:eval([[
-            local crud = require('crud')
-            return crud.insert_object('customers', ...)
-        ]],{customer})
+        local result, err = g.cluster.main_server.net_box:call('crud.insert_object', {'customers', customer})
 
         t.assert_equals(err, nil)
 
@@ -114,10 +111,9 @@ end
 
 add('test_non_existent_space', function(g)
     -- insert
-    local obj, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-        return crud.select('non_existent_space')
-    ]])
+    local obj, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'non_existent_space'}
+    )
 
     t.assert_equals(obj, nil)
     t.assert_str_contains(err.err, "Space non_existent_space doesn't exist")
@@ -142,12 +138,7 @@ add('test_select_all', function(g)
 
     table.sort(customers, function(obj1, obj2) return obj1.id < obj2.id end)
 
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil)
-        return result, err
-    ]])
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil})
 
     t.assert_equals(err, nil)
     t.assert_equals(result.rows, {
@@ -166,12 +157,7 @@ add('test_select_all', function(g)
     })
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil)
-        return result, err
-    ]])
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -179,14 +165,7 @@ add('test_select_all', function(g)
 
     -- after obj 2
     local after = crud_utils.flatten(customers[2], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil, {
-            after = ...,
-        })
-        return result, err
-    ]], {after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -194,14 +173,7 @@ add('test_select_all', function(g)
 
     -- after obj 4 (last)
     local after = crud_utils.flatten(customers[4], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil, {
-            after = ...,
-        })
-        return result, err
-    ]], {after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -229,16 +201,7 @@ add('test_select_all_with_first', function(g)
 
     -- first 2
     local first = 2
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local first = ...
-
-        local result, err = crud.select('customers', nil, {
-            first = first,
-        })
-        return result, err
-    ]], {first})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {first=first}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -246,16 +209,7 @@ add('test_select_all_with_first', function(g)
 
     -- first 0
     local first = 0
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local first = ...
-
-        local result, err = crud.select('customers', nil, {
-            first = first,
-        })
-        return result, err
-    ]], {first})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {first=first}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -295,16 +249,7 @@ add('test_negative_first', function(g)
 
     -- negative first w/o after
     local first = -10
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local first = ...
-
-        local objects, err = crud.select('customers', nil, {
-            first = first,
-        })
-        return objects, err
-    ]], {first})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {first=first}})
 
     t.assert_equals(result, nil)
     t.assert_str_contains(err.err, "Negative first should be specified only with after option")
@@ -314,18 +259,8 @@ add('test_negative_first', function(g)
     local first = -3
     local after = crud_utils.flatten(customers[5], g.space_format)
     local batch_size = 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local first, after, batch_size = ...
-
-        local objects, err = crud.select('customers', nil, {
-            first = first,
-            after = after,
-            batch_size = batch_size,
-        })
-        return objects, err
-    ]], {first, after, batch_size})
+    local result, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'customers', nil, {first=first, after=after, batch_size=batch_size}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -339,18 +274,8 @@ add('test_negative_first', function(g)
     local first = -2
     local after = crud_utils.flatten(customers[5], g.space_format)
     local batch_size = 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, first, after, batch_size = ...
-
-        local objects, err = crud.select('customers', conditions, {
-            first = first,
-            after = after,
-            batch_size = batch_size,
-        })
-        return objects, err
-    ]], {conditions, first, after, batch_size})
+    local result, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'customers', conditions, {first=first, after=after, batch_size=batch_size}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -364,18 +289,8 @@ add('test_negative_first', function(g)
     local first = -2
     local after = crud_utils.flatten(customers[5], g.space_format)
     local batch_size = 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, first, after, batch_size = ...
-
-        local objects, err = crud.select('customers', conditions, {
-            first = first,
-            after = after,
-            batch_size = batch_size,
-        })
-        return objects, err
-    ]], {conditions, first, after, batch_size})
+    local result, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'customers', conditions, {first=first, after=after, batch_size=batch_size}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -389,18 +304,8 @@ add('test_negative_first', function(g)
     local first = -2
     local after = crud_utils.flatten(customers[5], g.space_format)
     local batch_size = 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, first, after, batch_size = ...
-
-        local objects, err = crud.select('customers', conditions, {
-            first = first,
-            after = after,
-            batch_size = batch_size,
-        })
-        return objects, err
-    ]], {conditions, first, after, batch_size})
+    local result, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'customers', conditions, {first=first, after=after, batch_size=batch_size}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -414,18 +319,8 @@ add('test_negative_first', function(g)
     local first = -2
     local after = crud_utils.flatten(customers[5], g.space_format)
     local batch_size = 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, first, after, batch_size = ...
-
-        local objects, err = crud.select('customers', conditions, {
-            first = first,
-            after = after,
-            batch_size = batch_size,
-        })
-        return objects, err
-    ]], {conditions, first, after, batch_size})
+    local result, err = g.cluster.main_server.net_box:call(
+       'crud.select', {'customers', conditions, {first=first, after=after, batch_size=batch_size}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -464,45 +359,21 @@ add('test_select_all_with_batch_size', function(g)
     table.sort(customers, function(obj1, obj2) return obj1.id < obj2.id end)
 
     -- batch size 1
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil, {
-            batch_size = 1,
-        })
-
-        return result, err
-    ]])
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {batch_size=1}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
     t.assert_equals(objects, customers)
 
     -- batch size 3
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil, {
-            batch_size = 3,
-        })
-
-        return result, err
-    ]])
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {batch_size=3}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
     t.assert_equals(objects, customers)
 
     -- batch size 3 and first 6
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local result, err = crud.select('customers', nil, {
-            batch_size = 3,
-            first = 6,
-        })
-        return result, err
-    ]])
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', nil, {batch_size=3, first=6}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -573,14 +444,7 @@ add('test_eq_condition_with_index', function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -588,16 +452,7 @@ add('test_eq_condition_with_index', function(g)
 
     -- after obj 3
     local after = crud_utils.flatten(customers[3], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -628,14 +483,7 @@ add('test_ge_condition_with_index', function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -643,16 +491,7 @@ add('test_ge_condition_with_index', function(g)
 
     -- after obj 3
     local after = crud_utils.flatten(customers[3], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -683,14 +522,7 @@ add('test_le_condition_with_index',function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -698,16 +530,7 @@ add('test_le_condition_with_index',function(g)
 
     -- after obj 3
     local after = crud_utils.flatten(customers[3], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -738,14 +561,7 @@ add('test_lt_condition_with_index', function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -753,16 +569,7 @@ add('test_lt_condition_with_index', function(g)
 
     -- after obj 1
     local after = crud_utils.flatten(customers[1], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -798,14 +605,7 @@ add('test_multiple_conditions', function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -813,16 +613,7 @@ add('test_multiple_conditions', function(g)
 
     -- after obj 5
     local after = crud_utils.flatten(customers[5], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -853,14 +644,7 @@ add('test_composite_index', function(g)
     }
 
     -- no after
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -868,16 +652,7 @@ add('test_composite_index', function(g)
 
     -- after obj 2
     local after = crud_utils.flatten(customers[2], g.space_format)
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions, after = ...
-
-        local result, err = crud.select('customers', conditions, {
-            after = after,
-        })
-        return result, err
-    ]], {conditions, after})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {after=after}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -917,16 +692,7 @@ add('test_select_with_batch_size_1', function(g)
 
     -- LE
     local conditions = {{'<=', 'age', 35}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions, {
-            batch_size = 1,
-        })
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {batch_size=1}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -934,16 +700,7 @@ add('test_select_with_batch_size_1', function(g)
 
     -- LT
     local conditions = {{'<', 'age', 35}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions, {
-            batch_size = 1,
-        })
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {batch_size=1}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -951,16 +708,7 @@ add('test_select_with_batch_size_1', function(g)
 
     -- GE
     local conditions = {{'>=', 'age', 35}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions, {
-            batch_size = 1,
-        })
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {batch_size=1}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -968,16 +716,7 @@ add('test_select_with_batch_size_1', function(g)
 
     -- GT
     local conditions = {{'>', 'age', 35}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions, {
-            batch_size = 1,
-        })
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions, {batch_size=1}})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -1001,14 +740,7 @@ add('test_select_by_full_sharding_key', function(g)
     table.sort(customers, function(obj1, obj2) return obj1.id < obj2.id end)
 
     local conditions = {{'==', 'id', 3}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -1042,14 +774,7 @@ add('test_select_with_collations', function(g)
 
     -- full name index - unicode ci collation (case-insensitive)
     local conditions = {{'==', 'name', "Elizabeth"}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
@@ -1057,14 +782,7 @@ add('test_select_with_collations', function(g)
 
     -- city - no collation (case-sensitive)
     local conditions = {{'==', 'city', "oxford"}}
-    local result, err = g.cluster.main_server.net_box:eval([[
-        local crud = require('crud')
-
-        local conditions = ...
-
-        local result, err = crud.select('customers', conditions)
-        return result, err
-    ]], {conditions})
+    local result, err = g.cluster.main_server.net_box:call('crud.select', {'customers', conditions})
 
     t.assert_equals(err, nil)
     local objects = crud.unflatten_rows(result.rows, result.metadata)
