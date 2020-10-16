@@ -5,6 +5,7 @@ local vshard = require('vshard')
 local call = require('crud.common.call')
 local registry = require('crud.common.registry')
 local utils = require('crud.common.utils')
+local sharding = require('crud.common.sharding')
 local dev_checks = require('crud.common.dev_checks')
 
 local InsertError = errors.new_class('Insert',  {capture_stack = false})
@@ -50,6 +51,7 @@ end
 function insert.tuple(space_name, tuple, opts)
     checks('string', 'table', {
         timeout = '?number',
+        bucket_id = '?number',
     })
 
     opts = opts or {}
@@ -60,8 +62,7 @@ function insert.tuple(space_name, tuple, opts)
     end
     local space_format = space:format()
 
-    local key = utils.extract_key(tuple, space.index[0].parts)
-    local bucket_id = vshard.router.bucket_id_strcrc32(key)
+    local bucket_id = opts.bucket_id or sharding.get_bucket_id_by_tuple(tuple, space)
     local replicaset, err = vshard.router.route(bucket_id)
     if replicaset == nil then
         return nil, InsertError:new("Failed to get replicaset for bucket_id %s: %s", bucket_id, err.err)
@@ -104,17 +105,15 @@ end
 -- @param table obj
 --  Object
 --
--- @tparam ?number opts.timeout
---  Function call timeout
+-- @tparam ?table opts
+--  Options of insert.tuple
 --
 -- @return[1] object
 -- @treturn[2] nil
 -- @treturn[2] table Error description
 --
 function insert.object(space_name, obj, opts)
-    checks('string', 'table', {
-        timeout = '?number',
-    })
+    checks('string', 'table', '?table')
 
     opts = opts or {}
 

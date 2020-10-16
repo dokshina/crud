@@ -5,6 +5,7 @@ local vshard = require('vshard')
 local call = require('crud.common.call')
 local registry = require('crud.common.registry')
 local utils = require('crud.common.utils')
+local sharding = require('crud.common.sharding')
 local dev_checks = require('crud.common.dev_checks')
 
 local DeleteError = errors.new_class('Delete',  {capture_stack = false})
@@ -51,10 +52,10 @@ end
 function delete.call(space_name, key, opts)
     checks('string', '?', {
         timeout = '?number',
+        bucket_id = '?number',
     })
 
     opts = opts or {}
-
 
     local space = utils.get_space(space_name, vshard.router.routeall())
     if space == nil then
@@ -65,7 +66,7 @@ function delete.call(space_name, key, opts)
         key = key:totable()
     end
 
-    local bucket_id = vshard.router.bucket_id_strcrc32(key)
+    local bucket_id = opts.bucket_id or sharding.get_bucket_id_by_key(key, space)
     local replicaset, err = vshard.router.route(bucket_id)
     if replicaset == nil then
         return nil, DeleteError:new("Failed to get replicaset for bucket_id %s: %s", bucket_id, err.err)
