@@ -216,7 +216,7 @@ function select_module.pairs(space_name, user_conditions, opts)
     return gen
 end
 
-function select_module.call(space_name, user_conditions, opts)
+local function select_module_call_xc(space_name, user_conditions, opts)
     checks('string', '?table', {
         after = '?table',
         first = '?number',
@@ -264,6 +264,10 @@ function select_module.call(space_name, user_conditions, opts)
         metadata = table.copy(iter.space_format),
         rows = tuples,
     }
+end
+
+function select_module.call(space_name, user_conditions, opts)
+    return SelectError:pcall(select_module_call_xc, space_name, user_conditions, opts)
 end
 
 return select_module
