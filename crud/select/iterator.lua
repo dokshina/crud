@@ -6,18 +6,26 @@ local merger = require('merger')
 local SELECT_FUNC_NAME = '__select'
 local CALL_FUNC_NAME = '__call'
 
--- TODO: implement key_def cache
+local key_def_cache = {}
+setmetatable(key_def_cache, {__mode = 'k'})
+
 local function get_key_def(replicasets, space_name, index_name)
     -- Get requested and primary index metainfo.
     local conn = select(2, next(replicasets)).master.conn
     local primary_index = conn.space[space_name].index[0]
     local index = conn.space[space_name].index[index_name]
 
+    if key_def_cache[index] ~= nil then
+        return key_def_cache[index]
+    end
+
     -- Create a key def.
     local key_def = key_def_lib.new(index.parts)
     if not index.unique then
         key_def = key_def:merge(key_def_lib.new(primary_index.parts))
     end
+
+    key_def_cache[index] = key_def
 
     return key_def
 end
